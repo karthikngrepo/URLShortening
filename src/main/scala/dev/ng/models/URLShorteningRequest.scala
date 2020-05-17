@@ -8,5 +8,6 @@ case class URLShorteningRequest(clientId: String, secret: String, longUrl: Strin
 case class URLShorteningResponse(statusCode: String, shortUrl: String)
 
 trait JsonSupport extends SprayJsonSupport with DefaultJsonProtocol {
-  implicit val itemFormat: RootJsonFormat[URLShorteningRequest] = jsonFormat3(URLShorteningRequest)
+  implicit val requestFormat: RootJsonFormat[URLShorteningRequest] = jsonFormat3(URLShorteningRequest)
+  implicit val responseFormat: RootJsonFormat[URLShorteningResponse] = jsonFormat2(URLShorteningResponse)
 }

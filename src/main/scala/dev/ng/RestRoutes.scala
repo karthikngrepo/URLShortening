@@ -3,7 +3,8 @@ package dev.ng
 import java.time.LocalDateTime
 
 import akka.actor.ActorSystem
-import akka.http.scaladsl.model.{StatusCodes, Uri}
+import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.model.{HttpResponse, StatusCodes, Uri}
 import akka.http.scaladsl.server.{Directives, Route}
 import akka.stream.Materializer
 import akka.stream.alpakka.mongodb.javadsl.MongoSink
@@ -12,10 +13,12 @@ import akka.stream.scaladsl.{Sink, Source}
 import com.mongodb.reactivestreams.client.MongoDatabase
 import dev.ng.core.HashCodeGenerator
 import dev.ng.db.URLDetails
-import dev.ng.models.{JsonSupport, URLShorteningRequest}
+import dev.ng.models.{JsonSupport, URLShorteningRequest, URLShorteningResponse}
 
+import scala.compat.java8.FutureConverters._
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.util.{Failure, Success}
+
 
 object RestRoutes extends Directives with JsonSupport {
 
@@ -58,14 +61,20 @@ object RestRoutes extends Directives with JsonSupport {
             entity(as[URLShorteningRequest]) { request =>
 
               println(s"Got a POST request for url shortening and request=$request")
-              Source.single(request)
+              val postFuture = Source.single(request)
                 .map { req =>
                   val hashCode = HashCodeGenerator.getCode(req.longUrl)
                   println(s"Got the hashCode=$hashCode")
                   URLDetails(hashCode, req.longUrl, LocalDateTime.now)}
                 .runWith(MongoSink.insertOne[URLDetails](collection))
+                .toScala
 
-              complete("ok")
+              onComplete(postFuture) {
+                case Success(x) =>
+                  complete(URLShorteningResponse("0", ""))
+                case Failure(ex) =>
+                  complete(HttpResponse(InternalServerError, entity = "Failed to shorted the URL due to temporary error"))
+              }
 
             }
           }
