@@ -16,9 +16,11 @@ object ServerBoot {
     implicit val materializer: Materializer = Materializer(system)
     implicit val executionContext: ExecutionContextExecutor = system.dispatcher
 
-    val db = DatabaseConnectionFactory.getDatabaseConnection(List(MongoServerDetails("localhost", 27017)), name = "")
+    val db = DatabaseConnectionFactory.getDatabaseConnection(
+      List(MongoServerDetails("localhost", 27017)),
+      name = "urlshortner")
 
-    val bindingFuture = Http().bindAndHandle(route, interface = "localhost", port = 8080)
+    val bindingFuture = Http().bindAndHandle(getRoute(db), interface = "localhost", port = 8080)
     println(s"Server online at http://localhost:8080/\nPress RETURN to stop...")
     StdIn.readLine()
     bindingFuture

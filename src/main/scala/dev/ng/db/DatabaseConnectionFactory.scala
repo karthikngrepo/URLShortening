@@ -1,5 +1,7 @@
 package dev.ng.db
 
+import java.time.LocalDateTime
+
 import com.mongodb.reactivestreams.client.{MongoClients, MongoDatabase}
 import com.mongodb.{MongoClientSettings, ServerAddress}
 import org.bson.codecs.configuration.CodecRegistries.{fromProviders, fromRegistries}
@@ -9,7 +11,7 @@ import org.mongodb.scala.bson.codecs.Macros._
 
 import scala.collection.JavaConverters._
 
-case class URLDetails(_id: String, lognUrl: String, lastAccessed: String)
+case class URLDetails(_id: String, lognUrl: String, lastAccessed: LocalDateTime)
 
 case class MongoServerDetails(host: String, port: Int)
 
@@ -21,7 +23,7 @@ object DatabaseConnectionFactory {
                             name: String): MongoDatabase = {
     val serverAddress: List[ServerAddress] = mongoServerDetails
       .map(x => new ServerAddress(x.host, x.port))
-      .foldLeft(List.empty[ServerAddress])(_ ++ _)
+      .foldLeft(List.empty[ServerAddress])((a, b) => b :: a)
 
     val settings: MongoClientSettings = MongoClientSettings.builder()
       .applyToClusterSettings(builder =>

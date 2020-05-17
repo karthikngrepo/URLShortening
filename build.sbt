@@ -19,6 +19,8 @@ libraryDependencies ++= Seq(
   "com.lightbend.akka" %% "akka-stream-alpakka-mongodb" % "2.0.0",
   "com.typesafe.akka" %% "akka-stream" % AkkaVersion,
   "org.mongodb.scala" %% "mongo-scala-driver" % "2.9.0",
+  "commons-codec" % "commons-codec" % "1.14",
+  "com.typesafe.akka" %% "akka-http-spray-json" % "10.1.12",
 
   "com.typesafe.akka" %% "akka-http-testkit" % akkaHttpVersion % Test,
   "com.typesafe.akka" %% "akka-actor-testkit-typed" % akkaVersion % Test,

@@ -1,39 +1,76 @@
 package dev.ng
 
+import java.time.LocalDateTime
+
+import akka.actor.ActorSystem
 import akka.http.scaladsl.model.{StatusCodes, Uri}
-import akka.http.scaladsl.server.Directives._
-import akka.http.scaladsl.server.Route
+import akka.http.scaladsl.server.{Directives, Route}
+import akka.stream.Materializer
+import akka.stream.alpakka.mongodb.javadsl.MongoSink
 import akka.stream.alpakka.mongodb.scaladsl.MongoSource
+import akka.stream.scaladsl.{Sink, Source}
 import com.mongodb.reactivestreams.client.MongoDatabase
+import dev.ng.core.HashCodeGenerator
 import dev.ng.db.URLDetails
+import dev.ng.models.{JsonSupport, URLShorteningRequest}
 
-import scala.concurrent.ExecutionContextExecutor
+import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.util.{Failure, Success}
 
-object RestRoutes {
+object RestRoutes extends Directives with JsonSupport {
 
-  def getRoute(database: MongoDatabase)(implicit executionContext: ExecutionContextExecutor): Route = {
+  def getRoute(database: MongoDatabase)
+              (implicit system: ActorSystem,
+               aterializer: Materializer,
+               executionContext: ExecutionContextExecutor): Route = {
 
-    path(Remaining) { hashcode =>
-      concat(
-        get {
-          println(s"Got a GET request for hashcode=$hashcode")
+    val collectionName = "urldetails"
 
-          val collectionName = "urldetails"
-          val urlDetails = database.getCollection(collectionName, classOf[URLDetails])
-          MongoSource(urlDetails.find(classOf[URLDetails]))
-              .runWith()
+    val collection = database.getCollection(collectionName, classOf[URLDetails])
 
-          redirect(
-            Uri.apply("https://doc.akka.io/docs/akka-http/current/introduction.html"),
-            StatusCodes.PermanentRedirect
-          )
-        },
+    concat(
+      path(Remaining) { hashcode =>
+        concat(
+          get {
+            println(s"Got a GET request for hashcode=$hashcode")
+            val urlDetailsFuture: Future[Seq[URLDetails]] =
+              MongoSource(collection.find(classOf[URLDetails]))
+                .runWith(Sink.seq)
 
-        post {
-          println(s"Got a POST request for url=")
-        }
-      )
-    }
+            onComplete(urlDetailsFuture) {
+              case Success(x) =>
+                println(s"URLDetails=$x")
+                redirect(
+                  Uri.apply(x.head.lognUrl),
+                  StatusCodes.PermanentRedirect
+                )
+              case Failure(exception) =>
+                println(s"Encountered below exception while url redirection $exception")
+                complete("ok")
+            }
+          }
+        )
+      },
+
+      path("create") {
+        concat(
+          post {
+            entity(as[URLShorteningRequest]) { request =>
+
+              println(s"Got a POST request for url shortening and request=$request")
+              Source.single(request)
+                .map { req =>
+                  val hashCode = HashCodeGenerator.getCode(req.longUrl)
+                  println(s"Got the hashCode=$hashCode")
+                  URLDetails(hashCode, req.longUrl, LocalDateTime.now)}
+                .runWith(MongoSink.insertOne[URLDetails](collection))
+
+              complete("ok")
+
+            }
+          }
+        )
+      }
+    )
   }
 }
-
